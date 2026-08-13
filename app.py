@@ -22,6 +22,20 @@ def get_secret(name: str) -> str:
     except Exception:
         return ""
 
+def excel_safe(frame: pd.DataFrame) -> pd.DataFrame:
+    """Remove timezone information unsupported by Excel from every table."""
+    result = frame.copy()
+    for column in result.columns:
+        if pd.api.types.is_datetime64_any_dtype(result[column]):
+            result[column] = result[column].dt.tz_localize(None)
+        elif result[column].dtype == "object":
+            result[column] = result[column].map(
+                lambda value: value.tz_localize(None)
+                if isinstance(value, pd.Timestamp) and value.tzinfo is not None
+                else value
+            )
+    return result
+
 st.set_page_config(page_title="Communication Intelligence Scraper",layout="wide")
 st.title("Communication Intelligence Scraper")
 st.caption("Google News e YouTube gratuitos por padrão, com conectores opcionais para outras fontes")
@@ -137,18 +151,14 @@ if run:
         csv=df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("Baixar CSV",csv,"communication_intelligence.csv","text/csv")
         bio=io.BytesIO()
-        excel_df=df.copy()
-        for column in excel_df.columns:
-            if pd.api.types.is_datetime64_any_dtype(excel_df[column]):
-                excel_df[column]=excel_df[column].dt.tz_localize(None)
         with pd.ExcelWriter(bio,engine="openpyxl") as w:
-            excel_df.to_excel(w,index=False,sheet_name="data")
-            share_of_voice(df).to_excel(w,index=False,sheet_name="share_of_voice")
-            topic_table(df).to_excel(w,index=False,sheet_name="topics")
-            sentiment_table(df).to_excel(w,index=False,sheet_name="sentiment")
-            detect_peaks(df).to_excel(w,index=False,sheet_name="peaks")
-            top_content(df,100).to_excel(w,index=False,sheet_name="top_content")
-            top_creators(df,100).to_excel(w,index=False,sheet_name="top_creators")
+            excel_safe(df).to_excel(w,index=False,sheet_name="data")
+            excel_safe(share_of_voice(df)).to_excel(w,index=False,sheet_name="share_of_voice")
+            excel_safe(topic_table(df)).to_excel(w,index=False,sheet_name="topics")
+            excel_safe(sentiment_table(df)).to_excel(w,index=False,sheet_name="sentiment")
+            excel_safe(detect_peaks(df)).to_excel(w,index=False,sheet_name="peaks")
+            excel_safe(top_content(df,100)).to_excel(w,index=False,sheet_name="top_content")
+            excel_safe(top_creators(df,100)).to_excel(w,index=False,sheet_name="top_creators")
         st.download_button("Baixar Excel completo",bio.getvalue(),"communication_intelligence.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     with tabs[6]:
         title=f"Communication Intelligence — {brands_raw or query} — {start} a {end}"
