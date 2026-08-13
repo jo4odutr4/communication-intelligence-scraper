@@ -1,4 +1,4 @@
-import io, os, re
+import hmac, io, math, os, re
 from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
@@ -37,6 +37,25 @@ def excel_safe(frame: pd.DataFrame) -> pd.DataFrame:
     return result
 
 st.set_page_config(page_title="Communication Intelligence Scraper",layout="wide")
+
+def require_password() -> None:
+    """Protect the public application with a password stored outside GitHub."""
+    expected = get_secret("APP_PASSWORD")
+    if not expected:
+        return
+    if st.session_state.get("authenticated"):
+        return
+    st.title("Communication Intelligence Scraper")
+    st.caption("Acesso protegido")
+    supplied = st.text_input("Senha", type="password")
+    if st.button("Entrar", type="primary"):
+        if hmac.compare_digest(supplied, expected):
+            st.session_state.authenticated = True
+            st.rerun()
+        st.error("Senha incorreta.")
+    st.stop()
+
+require_password()
 st.title("Communication Intelligence Scraper")
 st.caption("Google News e YouTube gratuitos por padrão, com conectores opcionais para outras fontes")
 
@@ -51,7 +70,7 @@ with st.sidebar:
     start=st.date_input("Início",date.today()-timedelta(days=7))
     end=st.date_input("Fim",date.today())
     depth=st.selectbox("Profundidade",list(DEPTH),index=1)
-    custom_limit=st.number_input("Teto por plataforma",50,20000,DEPTH[depth],50)
+    custom_limit=st.number_input("Teto por plataforma",10,50,min(50,DEPTH[depth]),10,help="Limite de segurança para preservar a cota gratuita do YouTube.")
     platforms=st.multiselect(
         "Plataformas",
         ["Google News","YouTube","X","TikTok Research","Instagram (Apify)","TikTok (Apify)"],
@@ -73,12 +92,20 @@ if paid_selected:
 if run:
     limit=int(custom_limit)
     brands=[x.strip() for x in re.split(r"[,;\n]+",brands_raw+","+competitors) if x.strip()]
-    queries=build_queries(query,aliases=aliases,competitors=competitors,use_ai=use_query_ai,max_queries=12 if depth in ["Deep","Exhaustive"] else 6)
+    queries=build_queries(query,aliases=aliases,competitors=competitors,use_ai=use_query_ai,max_queries=2)
+    per_query=max(10,limit//max(1,len(queries)))
+    youtube_units=100*len(queries)*math.ceil(per_query/50) if "YouTube" in platforms else 0
+    session_units=st.session_state.get("youtube_units",0)
+    if session_units+youtube_units > 1000:
+        st.error("Limite de segurança do YouTube atingido nesta sessão. Abra uma nova sessão somente se a pesquisa for necessária.")
+        st.stop()
+    st.session_state.youtube_units=session_units+youtube_units
     st.subheader("Queries utilizadas")
     st.code("\n".join(queries),language="text")
     frames=[]; errors=[]
     start_iso=f"{start.isoformat()}T00:00:00Z"; end_iso=f"{(end+timedelta(days=1)).isoformat()}T00:00:00Z"
-    per_query=max(10,limit//max(1,len(queries)))
+    if "YouTube" in platforms:
+        st.caption(f"Consumo estimado do YouTube nesta sessão: {st.session_state.youtube_units} de 1.000 unidades.")
     with st.status("Coletando…",expanded=True) as status:
         for qi,q in enumerate(queries,1):
             st.write(f"Query {qi}/{len(queries)}: {q}")
