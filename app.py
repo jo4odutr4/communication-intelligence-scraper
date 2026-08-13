@@ -294,44 +294,57 @@ with st.sidebar:
         ai_icon="✅" if openai_key else "🔒"
         ai_message="Pronta, pode gerar cobrança" if openai_key else "Falta chave da OpenAI"
         st.write(f"{ai_icon} **Inteligência artificial:** {ai_message}")
-    st.header("Pesquisa")
-    query=st.text_area("Marca, tema ou pesquisa",value='CVC OR "CVC Viagens"')
-    brands_raw=st.text_input("Marcas analisadas",value="CVC")
-    competitors=st.text_input("Concorrentes",placeholder="Decolar, LATAM")
-    aliases=st.text_area("Variações, campanhas e hashtags",placeholder="CVC Viagens, #CVC, nome da campanha")
-    social_urls=st.text_area(
-        "Endereços de redes sociais",
-        placeholder="Cole 1 endereço público por linha para Instagram, TikTok, Facebook, X ou YouTube",
-        help="A Refetcher coleta perfis, publicações e vídeos conhecidos. Ela não pesquisa menções por palavra-chave.",
-    )
-    start=st.date_input("Início",date.today()-timedelta(days=7))
-    end=st.date_input("Fim",date.today())
-    depth=st.selectbox("Profundidade",list(DEPTH),index=1)
-    custom_limit=st.number_input("Teto por plataforma",10,50,min(50,DEPTH[depth]),10,help="Limite de segurança para preservar a cota gratuita do YouTube.")
-    platforms=st.multiselect(
-        "Plataformas",
-        available_platforms,
-        default=[name for name in ["Google News","YouTube"] if name in available_platforms],
-        help="Google News e YouTube usam as opções gratuitas configuradas. X e Apify podem consumir saldo.",
-    )
-    st.divider()
-    use_query_ai=st.checkbox("Inteligência artificial: expandir pesquisas",value=False,disabled=not openai_key,help="Pode gerar cobrança da OpenAI quando uma chave estiver configurada.")
-    use_enrichment=st.checkbox("Inteligência artificial: classificar conteúdos",value=False,disabled=not openai_key,help="Desligado por padrão para manter custo zero. A classificação heurística continua disponível.")
-    x_full=st.checkbox("X: usar arquivo completo",value=False,disabled=not x_token)
-    run=st.button("Escutar agora",type="primary",use_container_width=True)
+    st.caption("Configurações e disponibilidade")
 
-st.info("Modo custo zero ativo: Google News e YouTube estão prontos. X, Apify, TikTok Research e OpenAI permanecem opcionais e desmarcados.")
+st.markdown("### O QUE VOCÊ QUER ESCUTAR?")
+st.caption("Digite uma marca, campanha, produto ou assunto")
+query=st.text_input(
+    "Pesquisa principal",
+    placeholder="Exemplo: CVC Viagens, turismo de luxo, campanha de verão",
+    label_visibility="collapsed",
+)
+platforms=st.multiselect(
+    "Onde buscar",
+    available_platforms,
+    default=[name for name in ["Google News","YouTube"] if name in available_platforms],
+    help="Google News e YouTube são gratuitos. Redes sociais com Refetcher usam o crédito disponível.",
+)
+with st.expander("Ajustar a escuta"):
+    brands_raw=st.text_input("Marca principal",placeholder="Exemplo: CVC")
+    competitors=st.text_input("Concorrentes",placeholder="Exemplo: Decolar, LATAM")
+    aliases=st.text_area("Outros nomes, campanhas e hashtags",placeholder="Exemplo: CVC Viagens, #CVC, nome da campanha")
+    social_urls=st.text_area(
+        "Publicações e perfis específicos",
+        placeholder="Cole 1 endereço público por linha",
+        help="Use para coletar perfis, publicações e vídeos específicos de redes sociais.",
+    )
+    date_left,date_right=st.columns(2)
+    with date_left:
+        start=st.date_input("De",date.today()-timedelta(days=7))
+    with date_right:
+        end=st.date_input("Até",date.today())
+    depth=st.selectbox("Profundidade",list(DEPTH),index=1,format_func=lambda value:{"Quick":"Rápida","Standard":"Padrão","Deep":"Profunda","Exhaustive":"Exaustiva"}[value])
+    custom_limit=st.number_input("Resultados por fonte",10,50,min(50,DEPTH[depth]),10,help="O limite ajuda a preservar a cota gratuita do YouTube.")
+    use_query_ai=st.checkbox("Expandir pesquisa com inteligência artificial",value=False,disabled=not openai_key,help="Pode gerar cobrança quando uma chave da OpenAI estiver configurada.")
+    use_enrichment=st.checkbox("Classificar conteúdos com inteligência artificial",value=False,disabled=not openai_key,help="A classificação gratuita continua disponível mesmo com esta opção desligada.")
+    x_full=st.checkbox("Usar arquivo completo do X",value=False,disabled=not x_token)
+run=st.button("Escutar agora",type="primary",use_container_width=True)
+st.caption("Google News e YouTube não geram cobrança. Outras fontes só aparecem quando estão configuradas.")
 
 paid_selected=[p for p in platforms if p in {"X","Instagram com Apify","TikTok com Apify","Redes sociais com Refetcher"}]
 if paid_selected:
     st.warning("Atenção: a seleção atual inclui fontes que podem consumir saldo. A Refetcher usa primeiro o crédito gratuito disponível.")
 
 if run:
+    if not query.strip() and not social_urls.strip():
+        st.error("Digite uma marca ou assunto, ou cole pelo menos 1 endereço de rede social.")
+        st.stop()
     if not platforms:
         st.error("Selecione pelo menos 1 plataforma disponível.")
         st.stop()
     limit=int(custom_limit)
-    brands=[x.strip() for x in re.split(r"[,;\n]+",brands_raw+","+competitors) if x.strip()]
+    inferred_brand=brands_raw.strip() or query.strip()
+    brands=[x.strip() for x in re.split(r"[,;\n]+",inferred_brand+","+competitors) if x.strip()]
     queries=build_queries(query,aliases=aliases,competitors=competitors,use_ai=use_query_ai,max_queries=2)
     per_query=max(10,limit//max(1,len(queries)))
     request_keys={f"{q}|{start}|{end}|{per_query}" for q in queries}
