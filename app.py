@@ -36,6 +36,20 @@ def excel_safe(frame: pd.DataFrame) -> pd.DataFrame:
             )
     return result
 
+@st.cache_data(ttl=900, show_spinner=False)
+def collect_google_news_cached(query: str, limit: int) -> pd.DataFrame:
+    return google_news.collect(query, limit=limit)
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def collect_youtube_cached(
+    query: str,
+    start_iso: str,
+    end_iso: str,
+    limit: int,
+    _api_key: str,
+) -> pd.DataFrame:
+    return youtube.collect(query, _api_key, start_iso, end_iso, limit=limit)
+
 st.set_page_config(page_title="Communication Intelligence Scraper",layout="wide")
 
 def require_password() -> None:
@@ -56,12 +70,41 @@ def require_password() -> None:
     st.stop()
 
 require_password()
+
+youtube_key=get_secret("YOUTUBE_API_KEY")
+x_token=get_secret("X_BEARER_TOKEN")
+tiktok_token=get_secret("TIKTOK_RESEARCH_TOKEN")
+apify_token=get_secret("APIFY_TOKEN")
+instagram_actor=get_secret("APIFY_INSTAGRAM_ACTOR_ID")
+tiktok_actor=get_secret("APIFY_TIKTOK_ACTOR_ID")
+openai_key=get_secret("OPENAI_API_KEY")
+
+connector_status={
+    "Google News": (True,"Pronto sem credencial"),
+    "YouTube": (bool(youtube_key),"Pronto" if youtube_key else "Falta chave da API do YouTube"),
+    "X": (bool(x_token),"Credencial presente, pode exigir saldo" if x_token else "Falta credencial e pode exigir saldo"),
+    "TikTok Research": (bool(tiktok_token),"Credencial presente" if tiktok_token else "Exige aprovação do TikTok"),
+    "Instagram com Apify": (bool(apify_token and instagram_actor),"Pronto, pode consumir créditos" if apify_token and instagram_actor else "Faltam credencial e coletor da Apify"),
+    "TikTok com Apify": (bool(apify_token and tiktok_actor),"Pronto, pode consumir créditos" if apify_token and tiktok_actor else "Faltam credencial e coletor da Apify"),
+}
+available_platforms=[name for name,(ready,_) in connector_status.items() if ready]
+
 st.title("Communication Intelligence Scraper")
 st.caption("Google News e YouTube gratuitos por padrão, com conectores opcionais para outras fontes")
 
 DEPTH={"Quick":100,"Standard":500,"Deep":1500,"Exhaustive":5000}
 
 with st.sidebar:
+    if get_secret("APP_PASSWORD") and st.button("Sair da sessão",use_container_width=True):
+        st.session_state.clear()
+        st.rerun()
+    with st.expander("Disponibilidade dos conectores"):
+        for name,(ready,message) in connector_status.items():
+            icon="✅" if ready else "🔒"
+            st.write(f"{icon} **{name}:** {message}")
+        ai_icon="✅" if openai_key else "🔒"
+        ai_message="Pronta, pode gerar cobrança" if openai_key else "Falta chave da OpenAI"
+        st.write(f"{ai_icon} **Inteligência artificial:** {ai_message}")
     st.header("Pesquisa")
     query=st.text_area("Marca / tema / query",value='CVC OR "CVC Viagens"')
     brands_raw=st.text_input("Marcas analisadas",value="CVC")
@@ -73,33 +116,40 @@ with st.sidebar:
     custom_limit=st.number_input("Teto por plataforma",10,50,min(50,DEPTH[depth]),10,help="Limite de segurança para preservar a cota gratuita do YouTube.")
     platforms=st.multiselect(
         "Plataformas",
-        ["Google News","YouTube","X","TikTok Research","Instagram (Apify)","TikTok (Apify)"],
-        default=["Google News","YouTube"],
+        available_platforms,
+        default=[name for name in ["Google News","YouTube"] if name in available_platforms],
         help="Google News e YouTube usam as opções gratuitas configuradas. X e Apify podem consumir saldo.",
     )
     st.divider()
-    use_query_ai=st.checkbox("IA: expandir queries",value=False,help="Pode gerar cobrança da OpenAI quando uma chave estiver configurada.")
-    use_enrichment=st.checkbox("IA: classificar conteúdos",value=False,help="Desligado por padrão para manter custo zero. A classificação heurística continua disponível.")
-    x_full=st.checkbox("X: usar Full Archive",value=False)
+    use_query_ai=st.checkbox("Inteligência artificial: expandir pesquisas",value=False,disabled=not openai_key,help="Pode gerar cobrança da OpenAI quando uma chave estiver configurada.")
+    use_enrichment=st.checkbox("Inteligência artificial: classificar conteúdos",value=False,disabled=not openai_key,help="Desligado por padrão para manter custo zero. A classificação heurística continua disponível.")
+    x_full=st.checkbox("X: usar arquivo completo",value=False,disabled=not x_token)
     run=st.button("Pesquisar e analisar",type="primary",use_container_width=True)
 
 st.info("Modo custo zero ativo: Google News e YouTube estão prontos. X, Apify, TikTok Research e OpenAI permanecem opcionais e desmarcados.")
 
-paid_selected=[p for p in platforms if p in {"X","Instagram (Apify)","TikTok (Apify)"}]
+paid_selected=[p for p in platforms if p in {"X","Instagram com Apify","TikTok com Apify"}]
 if paid_selected:
     st.warning("Atenção: a seleção atual inclui fontes que podem consumir saldo. Remova X e Apify para garantir custo zero.")
 
 if run:
+    if not platforms:
+        st.error("Selecione pelo menos 1 plataforma disponível.")
+        st.stop()
     limit=int(custom_limit)
     brands=[x.strip() for x in re.split(r"[,;\n]+",brands_raw+","+competitors) if x.strip()]
     queries=build_queries(query,aliases=aliases,competitors=competitors,use_ai=use_query_ai,max_queries=2)
     per_query=max(10,limit//max(1,len(queries)))
-    youtube_units=100*len(queries)*math.ceil(per_query/50) if "YouTube" in platforms else 0
+    request_keys={f"{q}|{start}|{end}|{per_query}" for q in queries}
+    previous_keys=st.session_state.get("youtube_request_keys",set())
+    new_keys=request_keys-previous_keys if "YouTube" in platforms else set()
+    youtube_units=100*len(new_keys)*math.ceil(per_query/50)
     session_units=st.session_state.get("youtube_units",0)
     if session_units+youtube_units > 1000:
         st.error("Limite de segurança do YouTube atingido nesta sessão. Abra uma nova sessão somente se a pesquisa for necessária.")
         st.stop()
     st.session_state.youtube_units=session_units+youtube_units
+    st.session_state.youtube_request_keys=previous_keys|new_keys
     st.subheader("Queries utilizadas")
     st.code("\n".join(queries),language="text")
     frames=[]; errors=[]
@@ -110,10 +160,10 @@ if run:
         for qi,q in enumerate(queries,1):
             st.write(f"Query {qi}/{len(queries)}: {q}")
             if "Google News" in platforms:
-                try: frames.append(google_news.collect(q,limit=per_query))
+                try: frames.append(collect_google_news_cached(q,per_query))
                 except Exception as e: errors.append(f"Google News / {q}: {e}")
             if "YouTube" in platforms:
-                try: frames.append(youtube.collect(q,get_secret("YOUTUBE_API_KEY"),start_iso,end_iso,limit=per_query))
+                try: frames.append(collect_youtube_cached(q,start_iso,end_iso,per_query,youtube_key))
                 except Exception as e: errors.append(f"YouTube / {q}: {e}")
             if "X" in platforms:
                 try: frames.append(x_api.collect(q,get_secret("X_BEARER_TOKEN"),start_iso,end_iso,per_query,x_full))
@@ -121,14 +171,14 @@ if run:
             if "TikTok Research" in platforms:
                 try: frames.append(tiktok_research.collect(q,get_secret("TIKTOK_RESEARCH_TOKEN"),start.isoformat(),end.isoformat(),per_query))
                 except Exception as e: errors.append(f"TikTok Research / {q}: {e}")
-            if "Instagram (Apify)" in platforms:
+            if "Instagram com Apify" in platforms:
                 try:
-                    items=apify_generic.run_actor(get_secret("APIFY_INSTAGRAM_ACTOR_ID"),get_secret("APIFY_TOKEN"),{"search":q,"maxItems":per_query})
+                    items=apify_generic.run_actor(instagram_actor,apify_token,{"search":q,"maxItems":per_query})
                     frames.append(apify_generic.normalize(items,"instagram",q))
                 except Exception as e: errors.append(f"Instagram/Apify / {q}: {e}")
-            if "TikTok (Apify)" in platforms:
+            if "TikTok com Apify" in platforms:
                 try:
-                    items=apify_generic.run_actor(get_secret("APIFY_TIKTOK_ACTOR_ID"),get_secret("APIFY_TOKEN"),{"search":q,"maxItems":per_query})
+                    items=apify_generic.run_actor(tiktok_actor,apify_token,{"search":q,"maxItems":per_query})
                     frames.append(apify_generic.normalize(items,"tiktok",q))
                 except Exception as e: errors.append(f"TikTok/Apify / {q}: {e}")
         df=filter_dates(combine(frames),start,end)
