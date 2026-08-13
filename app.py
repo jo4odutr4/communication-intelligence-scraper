@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
-from app.collectors import google_news, youtube, x_api, tiktok_research, apify_generic
+from app.collectors import google_news, youtube, x_api, tiktok_research, apify_generic, refetcher
 from app.utils import combine, filter_dates
 from app.query_expansion import build_queries
 from app.enrichment import enrich
@@ -78,6 +78,7 @@ apify_token=get_secret("APIFY_TOKEN")
 instagram_actor=get_secret("APIFY_INSTAGRAM_ACTOR_ID")
 tiktok_actor=get_secret("APIFY_TIKTOK_ACTOR_ID")
 openai_key=get_secret("OPENAI_API_KEY")
+refetcher_key=get_secret("REFETCHER_API_KEY")
 
 connector_status={
     "Google News": (True,"Pronto sem credencial"),
@@ -86,6 +87,7 @@ connector_status={
     "TikTok Research": (bool(tiktok_token),"Credencial presente" if tiktok_token else "Exige aprovação do TikTok"),
     "Instagram com Apify": (bool(apify_token and instagram_actor),"Pronto, pode consumir créditos" if apify_token and instagram_actor else "Faltam credencial e coletor da Apify"),
     "TikTok com Apify": (bool(apify_token and tiktok_actor),"Pronto, pode consumir créditos" if apify_token and tiktok_actor else "Faltam credencial e coletor da Apify"),
+    "Redes sociais com Refetcher": (bool(refetcher_key),"Pronto, usa crédito pré-pago" if refetcher_key else "Falta chave gratuita da Refetcher"),
 }
 available_platforms=[name for name,(ready,_) in connector_status.items() if ready]
 
@@ -110,6 +112,11 @@ with st.sidebar:
     brands_raw=st.text_input("Marcas analisadas",value="CVC")
     competitors=st.text_input("Concorrentes",placeholder="Decolar, LATAM")
     aliases=st.text_area("Aliases / campanhas / hashtags",placeholder="CVC Viagens, #CVC, nome da campanha")
+    social_urls=st.text_area(
+        "Endereços de redes sociais",
+        placeholder="Cole 1 endereço público por linha para Instagram, TikTok, Facebook, X ou YouTube",
+        help="A Refetcher coleta perfis, publicações e vídeos conhecidos. Ela não pesquisa menções por palavra-chave.",
+    )
     start=st.date_input("Início",date.today()-timedelta(days=7))
     end=st.date_input("Fim",date.today())
     depth=st.selectbox("Profundidade",list(DEPTH),index=1)
@@ -128,7 +135,7 @@ with st.sidebar:
 
 st.info("Modo custo zero ativo: Google News e YouTube estão prontos. X, Apify, TikTok Research e OpenAI permanecem opcionais e desmarcados.")
 
-paid_selected=[p for p in platforms if p in {"X","Instagram com Apify","TikTok com Apify"}]
+paid_selected=[p for p in platforms if p in {"X","Instagram com Apify","TikTok com Apify","Redes sociais com Refetcher"}]
 if paid_selected:
     st.warning("Atenção: a seleção atual inclui fontes que podem consumir saldo. Remova X e Apify para garantir custo zero.")
 
@@ -153,6 +160,7 @@ if run:
     st.subheader("Queries utilizadas")
     st.code("\n".join(queries),language="text")
     frames=[]; errors=[]
+    refetcher_urls=[value.strip() for value in social_urls.splitlines() if value.strip()]
     start_iso=f"{start.isoformat()}T00:00:00Z"; end_iso=f"{(end+timedelta(days=1)).isoformat()}T00:00:00Z"
     if "YouTube" in platforms:
         st.caption(f"Consumo estimado do YouTube nesta sessão: {st.session_state.youtube_units} de 1.000 unidades.")
@@ -181,6 +189,12 @@ if run:
                     items=apify_generic.run_actor(tiktok_actor,apify_token,{"search":q,"maxItems":per_query})
                     frames.append(apify_generic.normalize(items,"tiktok",q))
                 except Exception as e: errors.append(f"TikTok/Apify / {q}: {e}")
+        if "Redes sociais com Refetcher" in platforms:
+            if not refetcher_urls:
+                errors.append("Refetcher: cole pelo menos 1 endereço público de rede social.")
+            else:
+                try: frames.append(refetcher.collect(refetcher_urls,refetcher_key))
+                except Exception as e: errors.append(f"Refetcher: {e}")
         df=filter_dates(combine(frames),start,end)
         if not df.empty:
             status.update(label=f"Classificando {len(df):,} itens…",state="running")
