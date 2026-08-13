@@ -61,7 +61,7 @@ def collect_youtube_cached(
 ) -> pd.DataFrame:
     return youtube.collect(query, _api_key, start_iso, end_iso, limit=limit)
 
-st.set_page_config(page_title="AMPFYCA",page_icon="⚡",layout="wide")
+st.set_page_config(page_title="Ampfy Escuta",page_icon="⚡",layout="wide")
 
 brand_css="""
 <style>
@@ -185,7 +185,7 @@ def require_password() -> None:
         return
     if st.session_state.get("authenticated"):
         return
-    st.markdown('<div class="ampfyca-hero"><div class="ampfyca-kicker">inteligência de comunicação</div><div class="ampfyca-name">AMPFYCA</div><div class="ampfyca-tagline">escuta, encontra, entende</div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="ampfyca-hero"><div class="ampfyca-kicker">inteligência de comunicação</div><div class="ampfyca-name">AMPFY ESCUTA</div><div class="ampfyca-tagline">escuta, encontra, entende</div></div>',unsafe_allow_html=True)
     st.caption("Acesso protegido")
     supplied = st.text_input("Senha", type="password")
     if st.button("Entrar", type="primary"):
@@ -217,7 +217,7 @@ connector_status={
 }
 available_platforms=[name for name,(ready,_) in connector_status.items() if ready]
 
-st.markdown('<div class="ampfyca-hero"><div class="ampfyca-kicker">inteligência de comunicação</div><div class="ampfyca-name">AMPFYCA</div><div class="ampfyca-tagline">escuta, encontra, entende</div></div>',unsafe_allow_html=True)
+st.markdown('<div class="ampfyca-hero"><div class="ampfyca-kicker">inteligência de comunicação</div><div class="ampfyca-name">AMPFY ESCUTA</div><div class="ampfyca-tagline">escuta, encontra, entende</div></div>',unsafe_allow_html=True)
 st.caption("Notícias, vídeos e redes sociais em uma leitura só")
 
 DEPTH={"Quick":100,"Standard":500,"Deep":1500,"Exhaustive":5000}
@@ -257,7 +257,7 @@ with st.sidebar:
     use_query_ai=st.checkbox("Inteligência artificial: expandir pesquisas",value=False,disabled=not openai_key,help="Pode gerar cobrança da OpenAI quando uma chave estiver configurada.")
     use_enrichment=st.checkbox("Inteligência artificial: classificar conteúdos",value=False,disabled=not openai_key,help="Desligado por padrão para manter custo zero. A classificação heurística continua disponível.")
     x_full=st.checkbox("X: usar arquivo completo",value=False,disabled=not x_token)
-    run=st.button("Ampfycar agora",type="primary",use_container_width=True)
+    run=st.button("Escutar agora",type="primary",use_container_width=True)
 
 st.info("Modo custo zero ativo: Google News e YouTube estão prontos. X, Apify, TikTok Research e OpenAI permanecem opcionais e desmarcados.")
 
