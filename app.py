@@ -174,6 +174,67 @@ hr { border-color: var(--ampfy-border) !important; }
 [data-baseweb="tab-list"] { border-bottom: 1px solid var(--ampfy-border); }
 [data-baseweb="tab"] { border-radius: 0 !important; }
 [aria-selected="true"] { color: var(--ampfy-amber) !important; }
+@media (max-width: 768px) {
+  [data-testid="stAppViewContainer"] .main .block-container {
+    padding: 16px 14px 80px !important;
+    max-width: 100% !important;
+  }
+  [data-testid="stSidebar"] {
+    width: min(92vw, 360px) !important;
+  }
+  [data-testid="stSidebar"] > div:first-child {
+    padding: 16px 14px 56px !important;
+  }
+  .ampfyca-hero {
+    border-top-width: 6px;
+    padding: 18px 0 16px;
+    margin-bottom: 16px;
+  }
+  .ampfyca-name {
+    font-size: clamp(40px, 15vw, 60px);
+    line-height: .9;
+    max-width: 7ch;
+  }
+  .ampfyca-tagline { font-size: 14px; }
+  h1 { font-size: 32px !important; }
+  h2 { font-size: 23px !important; }
+  h3 { font-size: 19px !important; }
+  .stTextInput input, .stTextArea textarea, .stNumberInput input,
+  [data-baseweb="select"] > div, [data-baseweb="input"] > div {
+    min-height: 48px !important;
+    font-size: 16px !important;
+  }
+  .stTextArea textarea { min-height: 96px !important; }
+  .stButton > button, .stDownloadButton > button {
+    min-height: 50px !important;
+    width: 100% !important;
+    font-size: 15px !important;
+  }
+  [data-testid="stMetric"] {
+    padding: 12px !important;
+  }
+  [data-testid="stHorizontalBlock"] {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  [data-testid="column"] {
+    min-width: calc(50% - 8px) !important;
+    width: calc(50% - 8px) !important;
+    flex: 1 1 calc(50% - 8px) !important;
+  }
+  [data-baseweb="tab-list"] {
+    overflow-x: auto !important;
+    scrollbar-width: none;
+    gap: 0 !important;
+  }
+  [data-baseweb="tab"] {
+    min-width: max-content !important;
+    padding: 10px 12px !important;
+  }
+  [data-testid="stDataFrame"] { overflow-x: auto !important; }
+  [data-testid="stAlertContainer"] { padding: 12px !important; }
+  [data-testid="stHeader"] { height: 48px !important; }
+}
 </style>
 """.replace("__CENTRALE_BOLD__",centrale_bold).replace("__CENTRALE_LIGHT__",centrale_light)
 st.markdown(brand_css,unsafe_allow_html=True)
