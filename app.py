@@ -137,7 +137,7 @@ st.info("Modo custo zero ativo: Google News e YouTube estão prontos. X, Apify, 
 
 paid_selected=[p for p in platforms if p in {"X","Instagram com Apify","TikTok com Apify","Redes sociais com Refetcher"}]
 if paid_selected:
-    st.warning("Atenção: a seleção atual inclui fontes que podem consumir saldo. Remova X e Apify para garantir custo zero.")
+    st.warning("Atenção: a seleção atual inclui fontes que podem consumir saldo. A Refetcher usa primeiro o crédito gratuito disponível.")
 
 if run:
     if not platforms:
@@ -161,6 +161,9 @@ if run:
     st.code("\n".join(queries),language="text")
     frames=[]; errors=[]
     refetcher_urls=[value.strip() for value in social_urls.splitlines() if value.strip()]
+    if len(refetcher_urls) > 10:
+        st.error("A Refetcher aceita no máximo 10 endereços por pesquisa neste aplicativo.")
+        st.stop()
     start_iso=f"{start.isoformat()}T00:00:00Z"; end_iso=f"{(end+timedelta(days=1)).isoformat()}T00:00:00Z"
     if "YouTube" in platforms:
         st.caption(f"Consumo estimado do YouTube nesta sessão: {st.session_state.youtube_units} de 1.000 unidades.")
