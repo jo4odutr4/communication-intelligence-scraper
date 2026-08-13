@@ -137,8 +137,12 @@ if run:
         csv=df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("Baixar CSV",csv,"communication_intelligence.csv","text/csv")
         bio=io.BytesIO()
+        excel_df=df.copy()
+        for column in excel_df.columns:
+            if pd.api.types.is_datetime64_any_dtype(excel_df[column]):
+                excel_df[column]=excel_df[column].dt.tz_localize(None)
         with pd.ExcelWriter(bio,engine="openpyxl") as w:
-            df.to_excel(w,index=False,sheet_name="data")
+            excel_df.to_excel(w,index=False,sheet_name="data")
             share_of_voice(df).to_excel(w,index=False,sheet_name="share_of_voice")
             topic_table(df).to_excel(w,index=False,sheet_name="topics")
             sentiment_table(df).to_excel(w,index=False,sheet_name="sentiment")
