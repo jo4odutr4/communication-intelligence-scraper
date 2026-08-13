@@ -1,4 +1,5 @@
-import hmac, io, math, os, re
+import base64, hmac, io, math, os, re
+from pathlib import Path
 from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
@@ -11,6 +12,16 @@ from app.analytics import share_of_voice, volume_daily, detect_peaks, top_conten
 from app.report import generate as generate_report
 
 load_dotenv()
+
+def embedded_font(filename: str) -> str:
+    """Embed official brand fonts so Streamlit Cloud renders them reliably."""
+    path = Path(__file__).parent / "assets" / "fonts" / filename
+    if not path.exists():
+        return ""
+    return base64.b64encode(path.read_bytes()).decode("ascii")
+
+centrale_bold=embedded_font("Centrale_Sans_Bold.otf")
+centrale_light=embedded_font("Centrale_Sans_Light.otf")
 
 def get_secret(name: str) -> str:
     """Read local environment variables or Streamlit Community Cloud secrets."""
@@ -50,7 +61,122 @@ def collect_youtube_cached(
 ) -> pd.DataFrame:
     return youtube.collect(query, _api_key, start_iso, end_iso, limit=limit)
 
-st.set_page_config(page_title="Communication Intelligence Scraper",layout="wide")
+st.set_page_config(page_title="AMPFYCA",page_icon="⚡",layout="wide")
+
+brand_css="""
+<style>
+@font-face {
+  font-family: "Centrale Sans";
+  src: url(data:font/otf;base64,__CENTRALE_BOLD__) format("opentype");
+  font-weight: 700;
+}
+@font-face {
+  font-family: "Centrale Sans";
+  src: url(data:font/otf;base64,__CENTRALE_LIGHT__) format("opentype");
+  font-weight: 300;
+}
+:root {
+  --ampfy-bg: #181716;
+  --ampfy-deep: #0E0D0B;
+  --ampfy-surface: #1F1C18;
+  --ampfy-tint: #221C0C;
+  --ampfy-border: #2A2620;
+  --ampfy-amber: #FBBA00;
+  --ampfy-text: #F5F2EC;
+  --ampfy-muted: #A6A099;
+}
+html, body, [class*="css"], .stApp {
+  font-family: "Centrale Sans", sans-serif;
+  font-weight: 300;
+  color: var(--ampfy-text);
+}
+p, label, [data-testid="stWidgetLabel"], [data-testid="stCaptionContainer"],
+[data-testid="stMarkdownContainer"] {
+  color: var(--ampfy-text);
+}
+[data-testid="stWidgetLabel"] p, [data-testid="stCaptionContainer"] p {
+  color: var(--ampfy-muted) !important;
+}
+.stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+  background: var(--ampfy-bg);
+}
+[data-testid="stSidebar"] {
+  background: var(--ampfy-deep);
+  border-right: 1px solid var(--ampfy-border);
+}
+h1, h2, h3, h4, .ampfyca-name {
+  font-family: "Centrale Sans", sans-serif !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  color: var(--ampfy-text) !important;
+}
+.ampfyca-hero {
+  border-top: 8px solid var(--ampfy-amber);
+  border-bottom: 1px solid var(--ampfy-border);
+  padding: 24px 0 20px;
+  margin: 0 0 24px;
+}
+.ampfyca-kicker {
+  color: var(--ampfy-amber);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.ampfyca-name {
+  font-size: clamp(42px, 7vw, 84px);
+  line-height: .95;
+  margin: 8px 0 10px;
+}
+.ampfyca-tagline {
+  color: var(--ampfy-muted);
+  font-size: 15px;
+  letter-spacing: .02em;
+}
+[data-testid="stForm"], [data-testid="stExpander"], [data-testid="stMetric"],
+[data-testid="stDataFrame"], [data-testid="stAlertContainer"] {
+  background: var(--ampfy-surface);
+  border: 1px solid var(--ampfy-border);
+  border-radius: 0 !important;
+}
+.stTextInput input, .stTextArea textarea, .stNumberInput input,
+[data-baseweb="select"] > div, [data-baseweb="input"] > div {
+  background: var(--ampfy-deep) !important;
+  color: var(--ampfy-text) !important;
+  border-color: var(--ampfy-border) !important;
+  border-radius: 0 !important;
+}
+.stButton > button, .stDownloadButton > button {
+  background: var(--ampfy-amber) !important;
+  color: var(--ampfy-deep) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  font-family: "Centrale Sans", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+  filter: brightness(.9);
+  transform: translateY(-1px);
+  transition: 220ms ease-out;
+}
+a, [data-testid="stLink"] { color: var(--ampfy-amber) !important; }
+hr { border-color: var(--ampfy-border) !important; }
+[data-testid="stMetricValue"] { color: var(--ampfy-amber); }
+[data-testid="stAlertContainer"] p, [data-testid="stAlertContainer"] a,
+[data-testid="stNotificationContentInfo"] p {
+  color: var(--ampfy-amber) !important;
+}
+[data-testid="stAlertContainer"] svg { fill: var(--ampfy-amber) !important; }
+[data-baseweb="tab-list"] { border-bottom: 1px solid var(--ampfy-border); }
+[data-baseweb="tab"] { border-radius: 0 !important; }
+[aria-selected="true"] { color: var(--ampfy-amber) !important; }
+</style>
+""".replace("__CENTRALE_BOLD__",centrale_bold).replace("__CENTRALE_LIGHT__",centrale_light)
+st.markdown(brand_css,unsafe_allow_html=True)
 
 def require_password() -> None:
     """Protect the public application with a password stored outside GitHub."""
@@ -59,7 +185,7 @@ def require_password() -> None:
         return
     if st.session_state.get("authenticated"):
         return
-    st.title("Communication Intelligence Scraper")
+    st.markdown('<div class="ampfyca-hero"><div class="ampfyca-kicker">inteligência de comunicação</div><div class="ampfyca-name">AMPFYCA</div><div class="ampfyca-tagline">escuta, encontra, entende</div></div>',unsafe_allow_html=True)
     st.caption("Acesso protegido")
     supplied = st.text_input("Senha", type="password")
     if st.button("Entrar", type="primary"):
@@ -91,8 +217,8 @@ connector_status={
 }
 available_platforms=[name for name,(ready,_) in connector_status.items() if ready]
 
-st.title("Communication Intelligence Scraper")
-st.caption("Google News e YouTube gratuitos por padrão, com conectores opcionais para outras fontes")
+st.markdown('<div class="ampfyca-hero"><div class="ampfyca-kicker">inteligência de comunicação</div><div class="ampfyca-name">AMPFYCA</div><div class="ampfyca-tagline">escuta, encontra, entende</div></div>',unsafe_allow_html=True)
+st.caption("Notícias, vídeos e redes sociais em uma leitura só")
 
 DEPTH={"Quick":100,"Standard":500,"Deep":1500,"Exhaustive":5000}
 
@@ -108,10 +234,10 @@ with st.sidebar:
         ai_message="Pronta, pode gerar cobrança" if openai_key else "Falta chave da OpenAI"
         st.write(f"{ai_icon} **Inteligência artificial:** {ai_message}")
     st.header("Pesquisa")
-    query=st.text_area("Marca / tema / query",value='CVC OR "CVC Viagens"')
+    query=st.text_area("Marca, tema ou pesquisa",value='CVC OR "CVC Viagens"')
     brands_raw=st.text_input("Marcas analisadas",value="CVC")
     competitors=st.text_input("Concorrentes",placeholder="Decolar, LATAM")
-    aliases=st.text_area("Aliases / campanhas / hashtags",placeholder="CVC Viagens, #CVC, nome da campanha")
+    aliases=st.text_area("Variações, campanhas e hashtags",placeholder="CVC Viagens, #CVC, nome da campanha")
     social_urls=st.text_area(
         "Endereços de redes sociais",
         placeholder="Cole 1 endereço público por linha para Instagram, TikTok, Facebook, X ou YouTube",
@@ -131,7 +257,7 @@ with st.sidebar:
     use_query_ai=st.checkbox("Inteligência artificial: expandir pesquisas",value=False,disabled=not openai_key,help="Pode gerar cobrança da OpenAI quando uma chave estiver configurada.")
     use_enrichment=st.checkbox("Inteligência artificial: classificar conteúdos",value=False,disabled=not openai_key,help="Desligado por padrão para manter custo zero. A classificação heurística continua disponível.")
     x_full=st.checkbox("X: usar arquivo completo",value=False,disabled=not x_token)
-    run=st.button("Pesquisar e analisar",type="primary",use_container_width=True)
+    run=st.button("Ampfycar agora",type="primary",use_container_width=True)
 
 st.info("Modo custo zero ativo: Google News e YouTube estão prontos. X, Apify, TikTok Research e OpenAI permanecem opcionais e desmarcados.")
 
@@ -211,7 +337,7 @@ if run:
         st.warning("Nenhum resultado retornado pelos conectores configurados.")
         st.stop()
 
-    tabs=st.tabs(["Visão geral","SOV & temas","Picos","Top conteúdos","Creators","Base","Relatório"])
+    tabs=st.tabs(["Visão geral","Voz e temas","Picos","Conteúdos","Criadores","Base","Relatório"])
     with tabs[0]:
         c1,c2,c3,c4=st.columns(4)
         c1.metric("Conteúdos",f"{len(df):,}")
